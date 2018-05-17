@@ -1,0 +1,120 @@
+```{r}
+library(caret)
+library(dplyr)
+library(tidyverse)
+library(ggplot2)
+library(moments)
+
+red_wine <- read.csv('winequality-red.csv')
+white_wine <- read.csv('winequality-white.csv')
+wine <- rbind(red_wine, white_wine)
+wine1 <- read.csv('winedata.csv')
+head(wine1)
+```
+```{r}
+log_data <- log1p(wine)
+log_data$quality <- wine$quality
+```
+```{r}
+for (i in colnames(wine)){
+  if (abs(skewness(wine[i])) > abs(skewness(log_data[i]))){
+    wine[i] <- log_data[i]
+  }
+}
+```
+```{r}
+scaled_data <- scale(wine)
+scaled_data <- data.frame(scaled_data)
+scaled_data$quality <- wine$quality
+outliers <- data.frame()
+
+for (i in 1:nrow(scaled_data)){
+  for (x in scaled_data[i,1:11]){
+    if (x > 3 | x < -3){
+      outliers <- rbind(outliers, i)
+
+    }
+  }
+}
+```
+```{r}
+outliers <- data.frame(table(outliers))
+outliers
+```
+```{r}
+outliers$outliers
+```
+
+```{r}
+L <- outliers$Freq > 0
+indexs <- outliers$outliers[L]
+indexs <- array(indexs)
+```
+```{r}
+#no_outliers <- wine[-c(indexs),]
+#head(no_outliers)
+no_outliers <- wine[!rownames(wine) %in% indexs, ]
+#nrow(wine[!rownames(wine) %in% indexs, ])
+scaled_data2 <- scaled_data[!rownames(wine) %in% indexs, ]
+```
+```{r}
+#scaled_data[2,] == data.frame(scale(no_outliers))[2,]
+
+nrow(merge(wine[82,],(no_outliers)))>0
+```
+```{r}
+indexs
+```
+```{r}
+library(mctest)
+omcdiag(wine[,1:11], wine[,12])
+```
+
+```{r}
+imcdiag(wine1[,1:9], wine1[,10])
+
+```
+
+```{r}
+library(ppcor)
+pcor(wine[,1:11], method = "pearson")
+
+```
+```{r}
+model <- plsRglm(wine[,12], wine[,1:11])
+print(model)
+```
+
+```{r}
+# define training control
+train_control <- trainControl(method="cv", number=10)
+# fix the parameters of the algorithm
+grid <- expand.grid(.nt=9, .alpha.pvals.expli=.05, modele="pls-glm-gaussian")
+# train the model
+model <- train(quality~., data=wine1, trControl=train_control, method="plsRglm", tuneGrid=grid)
+# summarize results
+print(model)
+```
+```{r}
+test_data <- log1p(wine)
+head(test_data)
+```
+```{r}
+head(wine)
+```
+```{r}
+model <- train(quality~., data=test_data, trControl=train_control, method="plsRglm", tuneGrid=grid)
+# summarize results
+print(model)
+```
+```{r}
+
+xWine <- wine[,1:11]
+yWine <- wine[,12]
+test <- cv.plsRglm(yWine, xWine, nt=2, verbose=TRUE, modele='pls')
+print(test)
+```
+```{r}
+predict(model, newdata = wine)
+```
+
